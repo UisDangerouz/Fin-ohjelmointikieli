@@ -1,0 +1,17 @@
+﻿# Fin-ohjelmointikieli 1.0
+
+# Copyright Matias Rantala. Kaikki oikeudet pidetään.
+
+# Syntaksi:
+# debug_kirjoitus_pois            || ei näytä debuggaamiseen tarvittavia tietoja koodia suoritettaessa. Tämä komento pitää olla ensimmäinen ohjelman komento toimiakseen.
+# jos(x==y) {suoritettava koodi.} || Jos x ei ole y hyppää sulkujen {, } sisällä olevan koodin yli.
+# aseta(x=5)                      || asettaa x arvoon. 5
+# odota(5)                        || Odottaa 5 sekuntia.
+# aseta(x=odota_input)            || Odottaa käyttäjän inputtia ja tallentaa sen muuttujaan.
+# mene(4)                         || Menee riville 4. x
+#                                 || Kommentti. Lopettaa koko rivin suorituksen ja jatkaa seuraavalle riville.
+# siivoa()                        || Tyhjentää konsolin tekstistä. Huom! ei toimi muualla kuin Windows ja Linux konsoleissa
+
+Muuta huomioitavaa:
+# 1) Ohjelmointikielen info-kirjoitukset ovat sinisiä, debug-kirjoitukset vihreitä ja virhe-ilmoitukset punaisia, mutta värit näkyvät vain väriä-tukevissa konsoleissa.
+# 2) ...
