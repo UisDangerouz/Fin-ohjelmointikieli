@@ -6,8 +6,10 @@ import os
 #GLOBAALEJA MUUTTUJIA
 koodi_tiedosto_nimi = "koodi.txt"
 koodin_aloitus_aika = datetime.now()
-#JOS TRUE KIRJOITTAA kirjoita_log_tietoa() KUTSUT, PÄÄLLÄ OLLESSA HELPOMPI DEBUGATA KOODIA
-debug_mode = True
+
+#KIRJOITTAA DEBUGGAAMISEEN TARVITTAVIA TIETOJA. 0 = EI KIRJOITA OLLENKAAN, 1 = VAIN KOODISSA OLEVAT VIRHEET, 2 = VAIN KOODIN SUORITUKSEN ETENEMINEN, 3 = TÄYSI DEBUGGAUS TILA
+#1 ON DEFAULT \/
+debug_mode = 1
 
 #TYHJENTÄÄ KONSOLIN TEKSISTÄ, KOODI TARKISTAA MIKÄ KÄYTTÖJÄRJESTELMÄ ON KYSEESSÄ JA VALITSEE SEN MUKAAN OIKEAN clear TAVAN
 def siivoa_konsoli():
@@ -20,11 +22,27 @@ class komennot:
 	muuttuja = "muuttuja"
 	kommentti = "#"
 	aseta = "aseta"
-	debug_kirjoitus_pois = "debug_kirjoitus_pois"
+	debug_tila = "debug_tila"
 	odota_input = "odota_input"
 	mene = "mene"
 	odota = "odota"
 	siivoa = "siivoa"
+	kutsu = "kutsu"
+	aliohjelma = "aliohjelma"
+#TEKEE OBJEKTI LISTAN LUOKASTA KOMENNOT, JOTTA ON HELPOMPI LOOPATA KOMENTOJEN ARVOT LÄPI 
+komennot_lista = []
+komennot_lista.append(komennot.jos)
+komennot_lista.append(komennot.kirjoita)
+komennot_lista.append(komennot.muuttuja)
+komennot_lista.append(komennot.kommentti)
+komennot_lista.append(komennot.aseta)
+komennot_lista.append(komennot.debug_tila)
+komennot_lista.append(komennot.odota_input)
+komennot_lista.append(komennot.mene)
+komennot_lista.append(komennot.odota)
+komennot_lista.append(komennot.siivoa)
+komennot_lista.append(komennot.kutsu)
+komennot_lista.append(komennot.aliohjelma)
 
 #LUOKKA VÄRIT
 class colors:
@@ -37,17 +55,22 @@ class colors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-#alustetaan funktiot
-def kirjoita_log(teksti):
-	nykyinen_aika = datetime.now()
-	print(colors.OKGREEN +  "[" + nykyinen_aika.strftime('%d.%m.%Y %H:%M:%S') + "] " + teksti)
-
+#alustetaan log funktiot
 def kirjoita_log_virhe(teksti):
-	nykyinen_aika = datetime.now()
-	print(colors.FAIL +  "[" + nykyinen_aika.strftime('%d.%m.%Y %H:%M:%S') + "] " + teksti)
+	global debug_mode
+	if debug_mode >= 1: 
+		nykyinen_aika = datetime.now()
+		print(colors.FAIL +  "[" + nykyinen_aika.strftime('%d.%m.%Y %H:%M:%S') + "] " + teksti)
+
+def kirjoita_log(teksti):
+	global debug_mode
+	if debug_mode >= 2: 
+		nykyinen_aika = datetime.now()
+		print(colors.OKGREEN +  "[" + nykyinen_aika.strftime('%d.%m.%Y %H:%M:%S') + "] " + teksti)
 
 def kirjoita_log_tietoa(teksti):
-	if debug_mode == True:
+	global debug_mode
+	if debug_mode >= 3:
 		nykyinen_aika = datetime.now()
 		print(colors.OKBLUE +  "[" + nykyinen_aika.strftime('%d.%m.%Y %H:%M:%S') + "] " + teksti)
 
@@ -67,33 +90,45 @@ def koodin_suorittaja(koodi):
 	#ALKUPERÄINEN TOKEN SISÄLTÄÄ ALKUPERÄISEN ARVON, ENNEN MUUTTUJAN NIMEN KORVAUSTA ARVOLLA, HUOM KÄYTETÄÄN AINOASTAAN KORVAA_MUUTTUJAT FUNKTIOSSA
 	orig_tokenit = tokenit[:]
 
-
 	kirjoita_log("Suoritetaan koodia...")
 	koodin_aloitus_aika = datetime.now()
 
 	#OHJELMAN MUUTTUJAT 
 	muuttuja_arvot = []
 	muuttuja_nimet = []
+	aliohjelma_info = []
+
+	#KUTSU PINO TALLENTAA KAIKKI ALIOHJELMA KUTSUT SIINÄ JÄRJESTYKSESSÄ KUN ON KUTSUTTU
+	#KUTSU PINO ON MUOTOA    MISTÄ_TOKENISTA_KUTSUTTU:ALIOHJELAM_LOPETUS_TOKEN
+	kutsu_pino = []
 
 	#LASKEE MILLÄ RIVILLÄ OHJELMA ON
 	rivi_nro = 1
-	viimeinen_rivi = rivi_nro
-	#TALLENTAA TOKENIN NUMERON, JOLLA UUSI RIVI ALKAA
-	rivi_alku_token_num = [] 
 
 
 	#i = token num
 	i = 0 
 	#ALOITUS i:n arvo
 	aloitus_i = 0
-	while i <= len(tokenit):
+	while len(tokenit) > i:
 		aloitus_i = i
+		
+		if tokenit[i].split(":")[0] == "rivi_loppu":
+			#+1 koska rivi rivi_loppu kertoo missä rivi loppuu, ei millä rivillä ohjelma on
+			rivi_nro = int(tokenit[i].split(":")[1]) + 1
 
-		if len(tokenit) > i + 1 and tokenit[i-1] == "rivi_loppu":
-			rivi_alku_token_num.append(str(rivi_nro) + ":" + str(i))
-		if len(tokenit) > i and tokenit[i] == "rivi_loppu":
-			rivi_nro += 1
-			viimeinen_rivi = rivi_nro
+		#TARKISTAA, ETTÄ EI OLE ALI OHJELMAN LOPUSSA, JOS ON SIIRTYY KUTSU PINOSSA SEURAAVAAN
+		if tokenit[i] == "}":
+			for kutsu in kutsu_pino:
+
+				kutsuttu, lopetus_token = kutsu.split(":")
+
+				if lopetus_token == str(i):
+					#+1 JOTTA EI SUORITA KUTSUA UUDESTAAN
+					i = int(kutsuttu) + 1
+
+					kutsu_pino = kutsu_pino[:-1]
+					break
 
 		#JOS
 		if len(tokenit) >= i + 6 and tokenit[i] == komennot.jos and tokenit[i+1] == "(" and tokenit[i+2] and tokenit[i+3] == "==" and tokenit[i+4] and tokenit[i+5] == ")" and tokenit[i+6][:1] == "{":
@@ -114,6 +149,34 @@ def koodin_suorittaja(koodi):
 			tokenit[i+2] = orig_tokenit[i+2]
 			tokenit[i+4] = orig_tokenit[i+4]
 
+		#ALIOHJELMA
+		elif len(tokenit) >= i + 4 and tokenit[i] == komennot.aliohjelma and tokenit[i+1] == "(" and tokenit[i+2] and tokenit[i+3] == ")" and tokenit[i+4][:1] == "{":
+
+			#JOS TOKEN ON ALIOHJELMA, HYPPÄÄ ALIOHJELMAN LOPPUUN KOSKA SITÄ EI OLE KUTSUTTU
+			for sulku in kihara_sulku_info:
+				alku, loppu = sulku.split(":")
+
+				if int(alku) == i + 4:
+
+					#MÄÄRITTÄÄ ALIOHJELMAN, HUOM JOS ALIOHJELMAA KUTSUTAAN ENNEN TÄTÄ SE ANTAA VIRHEEN NIIN KUIN PYTHONISSAKIN
+					#ALIOHJELMAN NIMI, ALIOHJELMAN ALOITUS TOKEN ELI { JÄLKEINEN SEKÄ ALIOHJELMAN LOPETUS TOKENIN }
+
+					#TARKISTAA, ETTÄ SAMANNIMISTÄ ALIOHJELMAA EI OLE OLEMASSA
+					sama_nimi = False
+					for aliohjelma in aliohjelma_info:
+						if tokenit[i+2] in aliohjelma:
+							sama_nimi = True
+							break
+					if not sama_nimi:
+						aliohjelma_info.append(tokenit[i+2] + ":" + str(i+5) + ":" + str(loppu))
+
+						kirjoita_log_tietoa("Aliohjelma " + str(tokenit[i+2]) + " alustettu." )
+
+						i = int(loppu)
+						break
+					else:
+						kirjoita_log_virhe("Virhe rivillä " + str(rivi_nro) + " aliohjelma nimellä " + tokenit[i+2] + " on jo olemassa")
+
 		#KIRJOITA				
 		elif len(tokenit) >= i + 3 and tokenit[i] == komennot.kirjoita and tokenit[i+1] == "(" and tokenit[i+2] and tokenit[i+3] == ")":
 
@@ -132,14 +195,12 @@ def koodin_suorittaja(koodi):
 
 		#LUO MUUTTUJA
 		elif len(tokenit) >= i + 3 and tokenit[i] == komennot.muuttuja and tokenit[i+1] == "(" and tokenit[i+2] and tokenit[i+3] == ")":
-			if not tokenit[i+2] in {komennot.aseta, komennot.muuttuja, komennot.jos, komennot.kirjoita, komennot.debug_kirjoitus_pois, komennot.odota_input}:
-				if tokenit[i+2].isalpha():
-					muuttuja_nimet.append(str(tokenit[i+2]))
-					muuttuja_arvot.append("")
-				else:
-					kirjoita_log_virhe("Virhe rivillä " + str(rivi_nro) + " muuttujan nimessä voi olla ainoastaan kirjaimia")
+			if tokenit[i+2].isalpha():
+				muuttuja_nimet.append(str(tokenit[i+2]))
+				muuttuja_arvot.append("")
+				kirjoita_log_tietoa("Muuttuja " + str(tokenit[i+2]) + " luotu.")
 			else:
-				kirjoita_log_virhe("Virhe rivillä " + str(rivi_nro) + " et voi luoda muuttujaa, jonka nimi on " + tokenit[i+2] + ", koska se on komento")
+				kirjoita_log_virhe("Virhe rivillä " + str(rivi_nro) + " muuttujan nimessä voi olla ainoastaan kirjaimia")
 
 		#ASETA MUUTTUJA
 		elif len(tokenit) >= i + 5 and tokenit[i] == komennot.aseta and tokenit[i+1] == "(" and tokenit[i+2] and tokenit[i+3] == "=" and tokenit[i+4] and tokenit[i+5] == ")":
@@ -170,6 +231,22 @@ def koodin_suorittaja(koodi):
 			if not muuttuja_olemassa:
 				kirjoita_log_virhe("Virhe rivillä " + str(rivi_nro) + " muuttujaa " + tokenit[i+2] + " ei ole olemassa")
 		
+		#KUTSU
+		elif len(tokenit) >= i + 3 and tokenit[i] == komennot.kutsu and tokenit[i+1] == "(" and tokenit[i+2] and tokenit[i+3] == ")":
+			aliohjelma_olemassa = False
+			for aliohjelma in aliohjelma_info:
+				aliohjelman_nimi, aloitus_token_index, lopetus_token_index = aliohjelma.split(":")
+
+				if tokenit[i+2] == aliohjelman_nimi:
+
+					kutsu_pino.append(str(i) + ":" + str(lopetus_token_index))
+
+					i = int(aloitus_token_index)
+					aliohjelma_olemassa = True
+					break
+			if not aliohjelma_olemassa:
+				kirjoita_log_virhe("Virhe rivillä " + str(rivi_nro) + " aliohjelmaa " + tokenit[i+2] + " ei ole olemassa")
+
 		#MENE
 		elif len(tokenit) >= i + 3 and tokenit[i] == komennot.mene and tokenit[i+1] == "(" and tokenit[i+2].isdigit and tokenit[i+3] == ")":
 			#KOHDE RIVI ON -1 SILLÄ HALUAMME SUORITTAA SIITÄ RIVISTÄ _LÄHTIEN_
@@ -177,6 +254,8 @@ def koodin_suorittaja(koodi):
 			kohde_rivi = str(kohde_rivi)
 
 			token_index = 0
+
+			mene_onnistui = False
 			for tok in tokenit:
 				
 				if "rivi_loppu:" in str(tok):
@@ -184,14 +263,18 @@ def koodin_suorittaja(koodi):
 
 					if loppu == kohde_rivi:
 						i = token_index 
+						mene_onnistui = True
+						break
 
 				token_index += 1
+			if not mene_onnistui:
+				kirjoita_log_virhe("Virhe rivillä " + str(rivi_nro) + " mene-komennon parametri on virheellinen. Tämä voi johtua siitä, että kohde rivi on liian suuri.")
+
 		#SIIVOA
 		elif len(tokenit) >= i + 3 and tokenit[i] == komennot.siivoa and tokenit[i+1] == "("  and tokenit[i+3] == ")":
-			print("LOL")
 			siivoa_konsoli()
 
-		#TARKISTAA, ETTÄ SUORITUS EI OLE HYPÄNNYT TOISELLE RIVILLE esim. JOS LAUSEEN LOPPU
+		#TARKISTAA, ETTÄ SUORITUS EI OLE HYPÄNNYT TOISELLE RIVILLE esim. JOS LAUSEEN LOPPU. JOS ON EI LISÄÄ i + 1
 		if aloitus_i == i:
 			i += 1
 
@@ -234,14 +317,13 @@ def generoi_tokenit(koodi):
 			#LUKIJA
 			lukija += merkki 
 
-
-			#JOS KOMENTTI LOPETTAA RIVIN SUORITTAMISEN
+			#JOS KOMENTTI LOPETTAA RIVIN TOKENOININ
 			if lukija == komennot.kommentti:
 				lukija = ""
 				break
 
 			#TESTAA LÖYTYYKÖ KOMENTOJA
-			elif lukija in {komennot.aseta, komennot.muuttuja, komennot.jos, komennot.kirjoita, komennot.debug_kirjoitus_pois, komennot.mene, komennot.odota, komennot.siivoa}:
+			elif lukija in komennot_lista:
 				tokenit.append(lukija)
 				lukija = ""
 
@@ -258,7 +340,7 @@ def generoi_tokenit(koodi):
 					tokenit.append(parametrit[0])
 					tokenit.append("==")
 					tokenit.append(parametrit[1])
-				elif "=" in lukija :
+				elif "=" in lukija:
 					parametrit = lukija[:len(lukija) - 1].split("=")
 					tokenit.append(parametrit[0])
 					tokenit.append("=")
@@ -304,7 +386,7 @@ def generoi_tokenit(koodi):
 
 
 
-	#LISÄÄ KOODIN LOPPUUN 20 rivi_loppu, jotta mene() toimisi 20 riviä koodin loputtua
+	#LISÄÄ KOODIN LOPPUUN 20 rivi_loppu, jotta mene() toimisi
 	for n in range(0,20):
 		rivi_nro += 1
 		tokenit.append("rivi_loppu:" + str(rivi_nro))
@@ -313,18 +395,11 @@ def generoi_tokenit(koodi):
 	for token_ind in range(0,len(tokenit)):
 		tokenit[token_ind] = str(tokenit[token_ind])
 
-
-
-
-	if tokenit[0] == komennot.debug_kirjoitus_pois:
-		global debug_mode 
-		debug_mode = False
-
+	#DEBUG KIRJOITUS
 	for i in range(0,len(tokenit)):
 		kirjoita_log_tietoa("merkki " + str(i).zfill(3) + ": " + tokenit[i])
 	
 	for sulku in kihara_sulku_info:
-		print(sulku)
 		alku, loppu = sulku.split(":")
 		kirjoita_log_tietoa("Koodi sulku alkaa kohdassa " + str(alku) + " ja loppuu " + str(loppu))
 
@@ -343,38 +418,69 @@ def generoi_tokenit(koodi):
 
 
 
-kirjoita_log("Etsitään suoritettavaa koodia (" + koodi_tiedosto_nimi + ")...")
 
-#testataan löytyykö koodi tiedostoa, jos ei löydy tekee sen
+#YRITETÄÄN AVATA KOODI TIEDOSTOA
 try:
+
+	#ENNALTA LUKEE KOODI TIEDOSTON ENSIMMÄISEN RIVIN, JA TARKISTAA MIKÄ DEBUG MODE ON VALITTU, JOS MITÄÄN DEBUG MODEA EI OLE VALITTU MODE ON 1
+	#KOODI TIEDOSTO SULJETAAN ENNALTA LUKEMISEN JÄLKEEN, JOTTA VARSINAINEN KOODIN LUKU ONNISTUU
 	koodi_tiedosto = open(koodi_tiedosto_nimi,'r', encoding='utf-8-sig')
+	rivi = koodi_tiedosto.readline().rstrip()
+	if rivi == "debug_tila(0)":
+		debug_mode = 0
+	elif rivi == "debug_tila(2)":
+		debug_mode = 2
+	elif rivi == "debug_tila(3)":
+		debug_mode = 3
+	else:
+		debug_mode = 1
+	koodi_tiedosto.close()
+
+
+	kirjoita_log("Etsitään suoritettavaa koodia (" + koodi_tiedosto_nimi + ")...")
 	kirjoita_log("Suoritettava koodi löytyi...")
 
-	#tiedosto löydetty, luetaan se
+	#LUETAAN KOODI TIEDOSTO JA SULJETAAN SE
+	koodi_tiedosto = open(koodi_tiedosto_nimi,'r', encoding='utf-8-sig')
 	koodi = koodi_tiedosto.read()
-	koodi_tiedosto.close
+	koodi_tiedosto.close()
+
+	#SULKEE KOODI TIEDOSTON, MUIDEN OHJELMIEN KÄYTETTÄVÄKSI
+
 	#suoritetaan koodi
 	koodin_suorittaja(koodi)
 except FileNotFoundError:
+	#KOODI TIEDOSTOA EI LÖYTYNYT
+
+	#ASETTAA DEBUG MODEN MAXIMIIN, JOTTA KAIKKI LOG KIRJOITUKSET MENEVÄT LÄPI
+	debug_mode = 3
+
+	kirjoita_log("Etsitään suoritettavaa koodia (" + koodi_tiedosto_nimi + ")...")
 	kirjoita_log_virhe("Koodi tiedostoa ei löytynyt...")
 	kirjoita_log("Luodaan koodi tiedosto...")
 	kirjoita_log_tietoa("Luodusta Koodi tiedostosta löytyy lisätietoja tästä ohjelmointikielestä.")
 
+	#TEKEE KOODI TIEDOSTON
 	koodi_tiedosto = open(koodi_tiedosto_nimi,'w', encoding='utf-8-sig')
 
+	#INFOA
 	koodi_tiedosto.write("# Fin-ohjelmointikieli 1.0\n")
 	koodi_tiedosto.write("\n")
 	koodi_tiedosto.write("# Copyright Matias Rantala. Kaikki oikeudet pidetään.\n")
 	koodi_tiedosto.write("\n")
 	koodi_tiedosto.write("# Syntaksi:\n")
-	koodi_tiedosto.write("# debug_kirjoitus_pois            || ei näytä debuggaamiseen tarvittavia tietoja koodia suoritettaessa. Tämä komento pitää olla ensimmäinen ohjelman komento toimiakseen.\n")
-	koodi_tiedosto.write("# jos(x==y) {suoritettava koodi.} || Jos x ei ole y hyppää sulkujen {, } sisällä olevan koodin yli.\n")
-	koodi_tiedosto.write("# aseta(x=5)                      || asettaa x arvoon. 5\n")
-	koodi_tiedosto.write("# odota(5)                        || Odottaa 5 sekuntia.\n")
-	koodi_tiedosto.write("# aseta(x=odota_input)            || Odottaa käyttäjän inputtia ja tallentaa sen muuttujaan.\n")
-	koodi_tiedosto.write("# mene(4)                         || Menee riville 4. x\n")
-	koodi_tiedosto.write("#                                 || Kommentti. Lopettaa koko rivin suorituksen ja jatkaa seuraavalle riville.\n")
-	koodi_tiedosto.write("# siivoa()                        || Tyhjentää konsolin tekstistä. Huom! ei toimi muualla kuin Windows ja Linux konsoleissa\n")
+	koodi_tiedosto.write("# debug_tila(x): 							|| Näyttää debuggaamiseen tarvittavia tietoja koodia suoritettaessa. Tämä komento pitää olla ensimmäinen ohjelman komento toimiakseen. Ylempi tila sisältää aina alemman tilan tiedot.\n")
+	koodi_tiedosto.write("#											|| x voi olla 0, 1, 2 tai 3. 0 = Ei kirjoita ollenkaan 1 = Vain koodissa olevat virheet, 2 = Vain koodin suorituksen eteneminen 3 = Täysi debuggaus-tila.\n")
+	koodi_tiedosto.write("# jos(x==y) {suoritettava koodi.} 		|| Jos x ei ole y hyppää sulkujen {, } sisällä olevan koodin yli.\n")
+	koodi_tiedosto.write("# muuttuja(x)								|| luo muuttujan x. Muuttujan nimessä voi olla ainoastaan kirjaimia ja komentojen nimet eivät käy.\n")
+	koodi_tiedosto.write("# aseta(x=5)								|| asettaa x arvoon 5.\n")
+	koodi_tiedosto.write("# odota(5) 								|| Odottaa 5 sekuntia.\n")
+	koodi_tiedosto.write("# aseta(x=odota_input) 					|| Odottaa käyttäjän inputtia ja tallentaa sen muuttujaan x.\n")
+	koodi_tiedosto.write("# mene(4) 								|| Menee riville 4. x\n")
+	koodi_tiedosto.write("# 										|| Kommentti. Lopettaa koko rivin suorituksen ja jatkaa seuraavalle riville.\n")
+	koodi_tiedosto.write("# siivoa()								|| Tyhjentää konsolin tekstistä. Huom! ei toimi muualla kuin Windows ja Linux konsoleissa\n")
+	koodi_tiedosto.write("# kutsu(x)								|| Kutsuu aliohjelmaa nimellä x.\n")
+	koodi_tiedosto.write("# aliohjelma(x) {Aliohjelman koodi}		|| Alustaa aliohjelman, jonka nimi on x.\n")
 	koodi_tiedosto.write("\n")
 	koodi_tiedosto.write("Muuta huomioitavaa:\n")
 	koodi_tiedosto.write("# 1) Ohjelmointikielen info-kirjoitukset ovat sinisiä, debug-kirjoitukset vihreitä ja virhe-ilmoitukset punaisia, mutta värit näkyvät vain väriä-tukevissa konsoleissa.\n")
@@ -383,10 +489,6 @@ except FileNotFoundError:
 
 
 
-
-
-
-#time.sleep(3.5)
 
 #LASKEE AJAN SEKUNTTEINA, JOKA MENI KOODIN SUORITUKSEEN
 suoritus_aika = (datetime.now() - koodin_aloitus_aika )
